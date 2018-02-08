@@ -8,8 +8,67 @@ import SearchBooks from './SearchBooks'
 class BooksApp extends React.Component {
   state = {
     books: [],
-    bookIDs: [],
-    bookshelves: [
+    searchResults: []
+  }
+
+  bookIDs = []
+
+  componentDidMount() {
+    this.getBooksInShelves()
+  }
+
+  clearSearchResults = () => {
+    this.setState({searchResults: []})
+  }
+
+  getBooksInShelves = () => {
+    BooksAPI.getAll().then((books) => {
+      this.setState({
+        books: books
+      })
+      this.createBookIDs(books)
+    })
+  }
+
+  createBookIDs = (books) => {
+    this.bookIDs = books.map(book => book.id)
+  }
+
+  updateBook = (bookToUpdate, newShelf) => {
+    bookToUpdate.shelf = newShelf
+    this.setState(state => {
+      this.bookIDs = this.bookIDs.filter(b => b.id !== bookToUpdate.id)
+      this.bookIDs.push(bookToUpdate.id)
+      return {books: [...state.books.filter(b => b.id !== bookToUpdate.id), bookToUpdate]}
+    })
+    BooksAPI.update(bookToUpdate, newShelf)
+  }
+
+  searchBooks = (query) => {
+    if (query) {
+      BooksAPI.search(query).then((searchResults) => {
+        this.getBooksInShelves()
+        if (searchResults) {
+          const filteredResults = searchResults.map((result) => {
+            let pos = this.bookIDs.indexOf(result.id)
+            if (pos !== -1) {
+              return this.state.books[pos]
+            } else {
+              result.shelf = "none"
+              return result
+            }
+          })
+          this.setState({searchResults: filteredResults})
+        }
+      }, this.clearSearchResults())
+    } else {
+      this.setState({searchResults: []})
+    }
+  }
+
+  render() {
+
+    const bookshelves = [
       {
         title: "Currently Reading",
         value: "currentlyReading"
@@ -20,63 +79,11 @@ class BooksApp extends React.Component {
         title: "Read",
         value: "read"
       }
-    ],
-    searchResults: []
-  }
+    ]
 
-  componentDidMount() {
-    this.getBooksInShelves()
-  }
-
-  getBooksInShelves = () => {
-    BooksAPI.getAll().then((books) => {
-      this.setState({
-        books: books,
-        bookIDs: books.map(book => book.id)
-      })
-    })
-  }
-
-  updateBook = (bookToUpdate, newShelf) => {
-    let newBooks = this.state.books
-    const pos = this.state.bookIDs.indexOf(bookToUpdate.id)
-    if (pos !== -1){
-      newBooks[pos].shelf = newShelf
-    }else{
-      bookToUpdate.shelf = newShelf
-      newBooks.push(bookToUpdate)
-    }
-    this.setState(state => ({books: newBooks}))
-
-    BooksAPI.update(bookToUpdate, newShelf)
-  }
-
-  searchBooks = (query) => {
-    if (query) {
-      BooksAPI.search(query).then((searchResults) => {
-        this.getBooksInShelves()
-        if (searchResults) {
-          const filteredResults = searchResults.map((result) => {
-            let pos = this.state.bookIDs.indexOf(result.id)
-            if (pos !== -1) {
-              return this.state.books[pos]
-            } else {
-              result.shelf = "none"
-              return result
-            }
-          })
-          this.setState({searchResults: filteredResults})
-        }
-      })
-    } else {
-      this.setState({searchResults: []})
-    }
-  }
-
-  render() {
     return (<div className="app">
-      <Route exact path='/' render={() => (<ListBooks books={this.state.books} bookshelves={this.state.bookshelves} onUpdateBook={this.updateBook}/>)}/>
-      <Route path="/search" render={() => (<SearchBooks onUpdateBook={this.updateBook} onSearchBooks={this.searchBooks} searchResults={this.state.searchResults}/>)}/>
+      <Route exact path='/' render={() => (<ListBooks books={this.state.books} bookshelves={bookshelves} onUpdateBook={this.updateBook}/>)}/>
+      <Route path="/search" render={() => (<SearchBooks onUpdateBook={this.updateBook} onSearchBooks={this.searchBooks} searchResults={this.state.searchResults} onBack={this.clearSearchResults}/>)}/>
     </div>)
   }
 }
